@@ -1,7 +1,18 @@
-node_modules
-dist
-.env
-.DS_Store
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
 generated/
-coverage
+*.tsbuildinfo
+
+# Local environment
+.env
+
+# Tooling cache
+.npm-cache/
+
+# OS / logs
+.DS_Store
 *.log

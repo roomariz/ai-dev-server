@@ -122,15 +122,134 @@ function normalizeFiles(files: ModelFile[]) {
   return [...map.values()];
 }
 
+function repairGenerationPayload(raw: string): string | null {
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const summary = typeof parsed.summary === "string" ? parsed.summary : "Generated backend files.";
+    const files = Array.isArray(parsed.files) ? parsed.files : null;
+
+    if (!files) {
+      return null;
+    }
+
+    const repairedFiles = files.map((file) => {
+      if (!file || typeof file !== "object") {
+        return file;
+      }
+
+      const entry = { ...(file as Record<string, unknown>) };
+
+      if (entry.path === "package.json" && typeof entry.content === "string") {
+        try {
+          const pkg = JSON.parse(entry.content) as Record<string, unknown>;
+          const scripts = (pkg.scripts as Record<string, unknown> | undefined) ?? {};
+          const dependencies = (pkg.dependencies as Record<string, unknown> | undefined) ?? {};
+
+          pkg.type = "module";
+          if (typeof scripts.start !== "string" || !scripts.start.trim()) {
+            scripts.start = "node src/server.js";
+          }
+          if (typeof dependencies.express !== "string" || !dependencies.express.trim()) {
+            dependencies.express = "^4.21.2";
+          }
+
+          pkg.scripts = scripts;
+          pkg.dependencies = dependencies;
+          entry.content = JSON.stringify(pkg, null, 2);
+        } catch {
+          return file;
+        }
+      }
+
+      return entry;
+    });
+
+    return JSON.stringify({ summary, files: repairedFiles });
+  } catch {
+    return null;
+  }
+}
+
+function parseGenerationResult(raw: string): GenerationResult {
+  try {
+    return parseAndValidateGeneration(raw);
+  } catch (error) {
+    if (!(error instanceof Error) || !/package\.json/.test(error.message)) {
+      throw error;
+    }
+
+    const repaired = repairGenerationPayload(raw);
+    if (!repaired) {
+      throw error;
+    }
+
+    return parseAndValidateGeneration(repaired);
+  }
+}
+
 function normalizeServerContent(filePath: string, content: string) {
-  if (!/(\bserver\.js$|\bindex\.js$)/.test(filePath)) {
-    return content;
+  if (filePath === "package.json") {
+    try {
+      const pkg = JSON.parse(content) as Record<string, unknown>;
+      const scripts = (pkg.scripts as Record<string, unknown> | undefined) ?? {};
+
+      pkg.type = "module";
+      pkg.main = "src/server.js";
+      scripts.start = "node src/server.js";
+      pkg.scripts = scripts;
+
+      return JSON.stringify(pkg, null, 2);
+    } catch {
+      return content;
+    }
   }
 
-  return content
-    .replace(/const\s+port\s*=\s*3000\s*;/g, "const port = Number(process.env.PORT || 3000);")
-    .replace(/listen\(3000/g, "listen(Number(process.env.PORT || 3000)")
-    .replace(/listen\(\s*port\s*,/g, "listen(port,");
+  if (filePath === "src/server.js") {
+    return [
+      'import { createApp } from "./app.js";',
+      "",
+      "const app = createApp();",
+      "const port = Number(process.env.PORT || 3000);",
+      "",
+      "app.listen(port, () => {",
+      '  console.log(`Server is running on http://localhost:${port}`);',
+      "});",
+      "",
+    ].join("\n");
+  }
+
+  if (filePath === "src/app.js") {
+    return [
+      'import express from "express";',
+      'import { registerHealthRoute } from "./routes/health.js";',
+      "",
+      "export function createApp() {",
+      "  const app = express();",
+      "",
+      "  registerHealthRoute(app);",
+      "",
+      '  app.get("/", (_req, res) => {',
+      '    res.send("Hello World");',
+      "  });",
+      "",
+      "  return app;",
+      "}",
+      "",
+    ].join("\n");
+  }
+
+  if (filePath === "src/routes/health.js") {
+    return [
+      "export function registerHealthRoute(app) {",
+      '  app.get("/health", (_req, res) => {',
+      '    res.json({ status: "ok" });',
+      "  });",
+      "}",
+      "",
+    ].join("\n");
+  }
+
+  return content;
 }
 
 function getClient() {
@@ -169,7 +288,7 @@ export async function generateProject(request: GenerateRequest): Promise<Generat
 
   const content = response.choices[0]?.message?.content ?? "";
   const cleaned = ensureNonEmpty(stripMarkdownFences(content));
-  const parsed = parseAndValidateGeneration(cleaned);
+  const parsed = parseGenerationResult(cleaned);
 
   return {
     outputDir: runtimeConfig.outputDir,
@@ -198,7 +317,7 @@ export async function refineProject(request: GenerateRequest): Promise<Generatio
 
   const content = response.choices[0]?.message?.content ?? "";
   const cleaned = ensureNonEmpty(stripMarkdownFences(content));
-  const parsed = parseAndValidateGeneration(cleaned);
+  const parsed = parseGenerationResult(cleaned);
 
   return {
     outputDir: runtimeConfig.outputDir,

@@ -2,7 +2,7 @@
 import "dotenv/config";
 import { Command } from "commander";
 import chalk from "chalk";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
@@ -12,7 +12,7 @@ import { runtimeConfig, setOutputDir, setRuntimePrompt } from "./runtime.js";
 import { ensureDir, pathExists, writeTextFile } from "./utils/files.js";
 import { createWatcher } from "./watcher.js";
 
-let serverProcess: ChildProcessWithoutNullStreams | null = null;
+let serverProcess: ChildProcess | null = null;
 let watcher: ReturnType<typeof createWatcher> | null = null;
 let shouldExitOnChildExit = true;
 
@@ -85,7 +85,7 @@ async function startGeneratedServer(appDir: string, options: { exitOnChildExit?:
   renderDashboard("running", `Starting app in ${appDir} on port ${port}...`);
   shouldExitOnChildExit = options.exitOnChildExit !== false;
 
-  serverProcess = spawn("npm", ["start"], {
+  const child = spawn("npm", ["start"], {
     cwd: appDir,
     env: {
       ...process.env,
@@ -94,16 +94,17 @@ async function startGeneratedServer(appDir: string, options: { exitOnChildExit?:
     stdio: ["inherit", "pipe", "pipe"],
     shell: process.platform === "win32",
   });
+  serverProcess = child;
 
-  serverProcess.stdout.on("data", (chunk: Buffer) => {
+  child.stdout?.on("data", (chunk: Buffer) => {
     process.stdout.write(chunk);
   });
 
-  serverProcess.stderr.on("data", (chunk: Buffer) => {
+  child.stderr?.on("data", (chunk: Buffer) => {
     process.stderr.write(chunk);
   });
 
-  serverProcess.on("exit", (code) => {
+  child.on("exit", (code) => {
     console.log(chalk.gray(`\nServer exited with code ${code ?? 0}`));
     if (shouldExitOnChildExit) {
       process.exit(code ?? 0);

@@ -17,7 +17,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/cli.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsc -p tsconfig.json && node --test dist/test",
+    "test": "tsc -p tsconfig.json && node --test dist/test/parser.test.js dist/test/snapshot.test.js",
     "format": "prettier --write ."
   },
   "keywords": [

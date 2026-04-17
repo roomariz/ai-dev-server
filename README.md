@@ -1,11 +1,35 @@
 # ai-dev-server
 
-CLI tool that generates, runs, and hot-reloads Express.js backends from natural language prompts.
+CLI tool that generates, validates, runs, and hot-reloads Express.js backends from natural language prompts.
+
+## Quick Start
+
+```bash
+npm install
+```
+
+Create a `.env` file with your OpenRouter key:
+
+```bash
+OPENROUTER_API_KEY=your_key
+OPENROUTER_MODEL=openai/gpt-4o-mini
+OPENROUTER_HTTP_REFERER=http://localhost:3000
+OPENROUTER_APP_NAME=ai-dev-server
+```
+
+Then run:
+
+```bash
+npm run dev -- init
+npm run dev -- generate "build a simple express API with a health route"
+npm run dev -- run
+```
 
 ## What it does
 
 - scaffolds a backend project from a prompt
 - generates files with OpenRouter or OpenAI
+- validates the generated structure before writing files
 - refines an existing generated project using the current files as context
 - installs dependencies
 - runs the generated server
@@ -136,6 +160,8 @@ OPENROUTER_APP_NAME=ai-dev-server
 
 The app will automatically use OpenRouter when `OPENROUTER_API_KEY` is present.
 
+If `generated/node_modules` is missing, `run` installs dependencies automatically before starting the server.
+
 ## Testing
 
 Run the parser and snapshot tests with:
@@ -151,3 +177,8 @@ The suite focuses on the strict generation contract:
 - path traversal fails
 - non-JSON output fails
 - refine snapshots preserve exact file paths and contents
+
+## Notes
+
+- `generated/` is ignored in git so the repo stays focused on the tool, not its output
+- `npm run dev -- --help` shows the CLI usage and command examples

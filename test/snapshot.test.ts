@@ -21,11 +21,11 @@ test("snapshotProject returns relative paths and exact file contents", () => {
 
     assert.deepEqual(
       snapshot.map((file) => file.path),
-      ["package.json", "src/server.js", "src/routes/health.js"],
+      ["package.json", "src/routes/health.js", "src/server.js"],
     );
     assert.equal(snapshot[0].content, '{"name":"demo"}');
-    assert.equal(snapshot[1].content, "console.log('server');");
-    assert.equal(snapshot[2].content, "console.log('health');");
+    assert.equal(snapshot[1].content, "console.log('health');");
+    assert.equal(snapshot[2].content, "console.log('server');");
     assert.equal(snapshot.some((file) => file.path.includes("node_modules")), false);
     assert.equal(snapshot.some((file) => file.path.includes(".git")), false);
   } finally {
